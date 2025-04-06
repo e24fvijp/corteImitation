@@ -1,18 +1,50 @@
-import os
+import datetime
 import io
-import openai
+import os
+import pickle
+import pathlib
+
+from audio_recorder_streamlit import audio_recorder
+from dotenv import load_dotenv
+from openai import OpenAI
+from pydub import AudioSegment
 import requests
 import streamlit as st
 import streamlit.components.v1 as stc
-from audio_recorder_streamlit import audio_recorder
-from pydub import AudioSegment
-from dotenv import load_dotenv
-import os
+
 
 # OpenAI API キー（環境変数から取得）
 WHISPER_API_URL = "https://api.openai.com/v1/audio/transcriptions"
+
+# 環境変数よりOPENAIAPIKEYの取得
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# 音声ファイル保存用のディレクトリを作成
+AUDIO_DIR = "./audioData"
+
+def save_audio_file(audio_bytes, user):
+    """
+    音声ファイルを保存する関数
+    """
+    # 現在の日時を取得
+    now = datetime.datetime.now()
+    date_str = now.strftime("%Y%m%d")
+    time_str = now.strftime("%H%M%S")
+    
+    # 日付ごとのディレクトリを作成
+    date_dir = os.path.join(AUDIO_DIR, date_str)
+    pathlib.Path(date_dir).mkdir(exist_ok=True)
+    
+    # ファイル名を生成（日付_時間_ユーザー名.wav）
+    filename = f"{date_str}_{time_str}_{user}.wav"
+    filepath = os.path.join(date_dir, filename)
+    
+    # 音声ファイルを保存
+    with open(filepath, "wb") as f:
+        f.write(audio_bytes)
+    
+    return filepath
 
 def transcribe_audio(audio_bytes) -> str:
     """
@@ -36,56 +68,50 @@ def transcribe_audio(audio_bytes) -> str:
         return f"エラー: {response.text}"
 
 def make_summary(prompt):
-    openai.api_key = OPENAI_API_KEY  # OpenAI APIキーを設定
-    
-    system_content = """
-    あなたは薬剤師です。薬剤師と患者の会話シーンです。
-    誰が喋っている言葉かは想像してください。
-    文章を患者の主観（Ｓ）、データなどの客観情報（Ｏ）、薬剤師の評価考察（Ａ）、薬剤師の指導内容（Ｐ）として内容を要約して、
-    S:
-    O:
-    A:
-    P:
-    のような形式で箇条書きで事実のみを出力してください。各項目に2文ある場合は句点、読点で改行。
-    :はS,O,A,Pの後以外では使わないでください。
-    2行ある場合はS:とつけるのは一つ目の項目のみ。
-    質問とその解答がある場合はその解答を完結に書いてください。(例    心不全ですか？はい → 心不全)など
-    会話の中に出てこなかったものは出力せず、SOAPに合致するものがなければその項目は出力不要。
-    自己紹介文や関係なさそうなものは省いてください。
-    """
+
+    client = OpenAI(api_key=OPENAI_API_KEY)
+
+    with open("prompt.txt","r", encoding="utf-8") as f:
+        system_content = f.read()
 
     # 修正：ChatCompletion.create を使用
-    res = openai.ChatCompletion.create(
-    model="gpt-4o-mini",
-    messages=[
+    res = client.chat.completions.create(
+        model = "gpt-4o-mini",
+        messages= [
             {"role": "system", "content": system_content},
             {"role": "user", "content": prompt}
         ]
     )
-
     # 要約結果を返す
-    return res["choices"][0]["message"]["content"]
+    return res.choices[0].message.content
 
-def write_copyable_text(text):
-    html_content = f"""
-    <button onclick="navigator.clipboard.writeText('{text}')">
-        copy
-    </button>
+def append_pickle_files(user, remarks, text, audio_path):
     """
-
-    if ":" in text:
-        st.write(text.split(":")[0])
-        col1,col2 = st.columns([1,3])
-        with col1:
-            stc.html(html_content,height=30)
-        with col2:
-            st.write(text.split(":")[1])
+    データをpickleファイルに保存する関数
+    """
+    today = datetime.date.today().strftime("%Y%m%d")
+    save_path = f"./pickleData/{today}.pickle"
+    append_data = [user, remarks, text, audio_path]  # 音声ファイルパスを追加
+    if os.path.exists(save_path):
+        with open(save_path,"rb") as f:
+            data = pickle.load(f)
+        data.append(append_data)
     else:
-        col1,col2 = st.columns([1,3])
-        with col1:
-            stc.html(html_content,height=30)
-        with col2:
-            st.write(text)
+        data = [append_data]
+    with open(save_path,"wb") as f:
+        pickle.dump(data,f)
+
+#メインプログラム
+# タイトルを設定
+st.title('音声解析アプリケーション')
+
+user = st.radio(
+    "薬剤師を選択",
+    ["薬剤師A","薬剤師B","薬剤師C"],
+    horizontal = True
+)
+
+remarks_input = st.text_area("備考欄(検索キー)","",height=68, max_chars=200)
 
 audio_bytes = audio_recorder(pause_threshold=60.0)
 
@@ -97,6 +123,9 @@ if st.button("解析開始"):
         place1.write("")
         place2 = st.empty()
         place2.write("解析中...")
+
+        # 音声ファイルを保存
+        audio_filepath = save_audio_file(audio_bytes, user)
 
         # BytesIO オブジェクトに変換
         audio_io = io.BytesIO(audio_bytes)
@@ -113,14 +142,7 @@ if st.button("解析開始"):
         # テキスト変換
         transcript = transcribe_audio(wav_bytes)
         place2.write("音声解析完了 GPTで要約中")
-        summary = make_summary(transcript)
-        place2.write("")
-        
-        sql.ConnectSQl()
-        
-
-        # st.write(summary)
-        lines = summary.split("\n")
-        for line in lines:
-            write_copyable_text(line)
+        summary = make_summary(transcript)  
+        append_pickle_files(user, remarks_input, summary, audio_filepath)
+        place2.write("解析完了 保存しました") 
 

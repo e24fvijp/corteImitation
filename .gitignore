@@ -4,5 +4,8 @@ Lib/
 Scripts/
 share/
 etc/
+.corteImitation/
+audioData/
+pickleData/
 app.py
 app2.py
