@@ -1,11 +1,8 @@
 .env
 speech-to-text-test-403802-733d27e22b93.json
-Lib/
-Scripts/
 share/
 etc/
+.venv/
 .corteImitation/
 audioData/
 pickleData/
-app.py
-app2.py
