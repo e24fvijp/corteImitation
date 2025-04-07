@@ -145,9 +145,13 @@ if st.button("解析開始"):
             sample_width=audio.sample_width,
             channels=audio.channels
         )
+        
+        # 音量の正規化（-20dBFSに正規化）
+        normalized_audio = reduced_audio.normalize(headroom=0.1)
+        
         # 音声データをバイト列に変換
         wav_io = io.BytesIO()
-        reduced_audio.export(wav_io, format="wav")
+        normalized_audio.export(wav_io, format="wav")
         wav_bytes = wav_io.getvalue()
 
         # テキスト変換

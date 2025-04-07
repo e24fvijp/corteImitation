@@ -108,7 +108,6 @@ if selected_date:
             horizontal=True
         )
         show_data = [x for x in data if x[0] == user]
-        print(show_data)
         show_result(show_data)
     else:
         st.write(f"{selected_date}のデータはありません")
