@@ -2,10 +2,16 @@ import os
 import pickle
 import streamlit as st
 
+#ページの翻訳提案をしないように設定
+st.markdown(
+    '<meta name="google" content="notranslate">', 
+    unsafe_allow_html=True
+)
+
 st.title("薬剤師の名前リスト")
 st.write("薬剤師名を追加、変更、削除し画面下の更新ボタンを押してください")
 
-pharmacist_list_path = "pickleData/pharmacist_list.pickle"
+pharmacist_list_path = "harmacist_list.pickle"
 
 def add_text_inputs(pharmacist_list=None, num_columns=1):
     inputs = []

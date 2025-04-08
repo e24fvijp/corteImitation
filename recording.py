@@ -13,6 +13,13 @@ from openai import OpenAI
 from pydub import AudioSegment
 import requests
 import streamlit as st
+
+#ページの翻訳提案をしないように設定
+st.markdown(
+    '<meta name="google" content="notranslate">', 
+    unsafe_allow_html=True
+)
+
 # OpenAI API キー（環境変数から取得）
 WHISPER_API_URL = "https://api.openai.com/v1/audio/transcriptions"
 
@@ -43,7 +50,7 @@ def save_audio_file(audio_bytes, user):
     
     return filepath
 
-def transcribe_audio(audio_bytes) -> str:
+def transcribe_whisper(audio_bytes) -> str:
     """
     OpenAI Whisper API を使って音声をテキストに変換する
     """
@@ -63,6 +70,9 @@ def transcribe_audio(audio_bytes) -> str:
         return response.json().get("text", "テキスト化に失敗しました")
     else:
         return f"エラー: {response.text}"
+
+def transcribe_AmiVoice(audio_bytes) -> str:
+    pass
 
 def make_summary(prompt):
 
@@ -97,12 +107,34 @@ def append_pickle_files(user, time_str, remarks, text, audio_path):
     with open(save_path,"wb") as f:
         pickle.dump(data,f)
 
+def audio_processor(audio_byte):
+    # BytesIO オブジェクトに変換
+    audio_io = io.BytesIO(audio_byte)
+    # pydub で wav 読み込み & モノラル変換
+    audio = AudioSegment.from_wav(audio_io)
+    audio_np = np.array(audio.get_array_of_samples())
+    reduced_audio_np = nr.reduce_noise(y=audio_np,sr=audio.frame_rate)
+    reduced_audio = AudioSegment(
+        reduced_audio_np.tobytes(),
+        frame_rate=audio.frame_rate,
+        sample_width=audio.sample_width,
+        channels=audio.channels
+    )
+    # 音量の正規化（-20dBFSに正規化）
+    normalized_audio = reduced_audio.normalize(headroom=0.1)
+    # 音声データをバイト列に変換
+    wav_io = io.BytesIO()
+    normalized_audio.export(wav_io, format="wav")
+    wav_bytes = wav_io.getvalue()
+    return wav_bytes
+
+
 #メインプログラム
 # タイトルを設定
 st.title('音声解析アプリケーション')
 
 #薬剤師リストの読み込み
-pharmacist_list_path = "pickleData/pharmacist_list.pickle"
+pharmacist_list_path = "pharmacist_list.pickle"
 with open(pharmacist_list_path,"rb") as f:
     pharmacist_list = pickle.load(f)
     pharmacist_list = [name for name in pharmacist_list if name]
@@ -111,6 +143,12 @@ user = st.radio(
     "薬剤師を選択",
     pharmacist_list,
     horizontal = True
+)
+
+engine = st.radio(
+    "音声解析エンジンを選択   whisper:約50円/時間 AmiVoice 297.0円/時間 医療特化",
+    ["whisper","AmiVoice"],
+    horizontal=True
 )
 
 remarks_input = st.text_area("備考欄(検索キー)","",height=68, max_chars=200)
@@ -128,38 +166,19 @@ else:
 if st.button("解析開始"):
     place1.write("")
     if not audio_bytes:
-        place2.write("録音が存在しません")
+        place2.warning("録音が存在しません")
     else:
-        place2.write("解析中...")
+        place2.warning("音声解析中です。終了するまで他のページに移動しないでください。")
         # 音声ファイルを保存
         audio_filepath = save_audio_file(audio_bytes, user)
-        # BytesIO オブジェクトに変換
-        audio_io = io.BytesIO(audio_bytes)
-        # pydub で wav 読み込み & モノラル変換
-        audio = AudioSegment.from_wav(audio_io)
-        audio_np = np.array(audio.get_array_of_samples())
-        reduced_audio_np = nr.reduce_noise(y=audio_np,sr=audio.frame_rate)
-        reduced_audio = AudioSegment(
-            reduced_audio_np.tobytes(),
-            frame_rate=audio.frame_rate,
-            sample_width=audio.sample_width,
-            channels=audio.channels
-        )
-        
-        # 音量の正規化（-20dBFSに正規化）
-        normalized_audio = reduced_audio.normalize(headroom=0.1)
-        
-        # 音声データをバイト列に変換
-        wav_io = io.BytesIO()
-        normalized_audio.export(wav_io, format="wav")
-        wav_bytes = wav_io.getvalue()
-
+        # 音声ファイルのノイズリダクション、音量の正規化
+        wav_bytes = audio_processor(audio_bytes)
         # テキスト変換
-        transcript = transcribe_audio(wav_bytes)
-        place2.write("音声解析完了 GPTで要約中 完了後ページ遷移します。")
-        summary = make_summary(transcript)     
-        now = datetime.datetime.now()
-        time_str = now.strftime("%H:%M")
+        transcript = transcribe_whisper(wav_bytes) if engine == "Whisper" else transcribe_AmiVoice(wav_bytes)
+        place2.warning("音声解析完了 GPTで要約中 完了後ページ遷移します。")
+        summary = make_summary(transcript)
+        time_str = datetime.datetime.now().strftime("%H:%M")
         append_pickle_files(user, time_str, remarks_input, summary, audio_filepath)
-        place2.write("解析完了 保存しました") 
+        place2.warning("解析完了 保存しました") 
+        time.sleep(0.5)
         st.switch_page("pages/data.py")
