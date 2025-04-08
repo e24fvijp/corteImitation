@@ -11,7 +11,8 @@ st.markdown(
 st.title("薬剤師の名前リスト")
 st.write("薬剤師名を追加、変更、削除し画面下の更新ボタンを押してください")
 
-pharmacist_list_path = "harmacist_list.pickle"
+# データディレクトリのパスを設定
+pharmacist_list_path = "pharmacist_list.pickle"
 
 def add_text_inputs(pharmacist_list=None, num_columns=1):
     inputs = []
@@ -31,7 +32,7 @@ def add_text_inputs(pharmacist_list=None, num_columns=1):
     return inputs
 
 def update_pharmacist_list(pharmacist_list):
-    os.makedirs(os.path.dirname(pharmacist_list_path), exist_ok=True)
+    # os.makedirs(os.path.dirname(pharmacist_list_path), exist_ok=True)
     with open(pharmacist_list_path, "wb") as f:
         pickle.dump(pharmacist_list, f)
 

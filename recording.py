@@ -174,7 +174,7 @@ if st.button("解析開始"):
         # 音声ファイルのノイズリダクション、音量の正規化
         wav_bytes = audio_processor(audio_bytes)
         # テキスト変換
-        transcript = transcribe_whisper(wav_bytes) if engine == "Whisper" else transcribe_AmiVoice(wav_bytes)
+        transcript = transcribe_whisper(wav_bytes) if engine == "whisper" else transcribe_AmiVoice(wav_bytes)
         place2.warning("音声解析完了 GPTで要約中 完了後ページ遷移します。")
         summary = make_summary(transcript)
         time_str = datetime.datetime.now().strftime("%H:%M")
