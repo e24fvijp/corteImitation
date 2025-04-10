@@ -6,3 +6,4 @@ etc/
 .corteImitation/
 audioData/
 pickleData/
+__pycache__/
