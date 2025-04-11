@@ -9,8 +9,7 @@ import os
 import function
 
 dotenv.load_dotenv()
-APP_KEY = os.getenv("AMIVOICE_APP_KEY")
-
+APP_KEY = os.getenv("AMIVOICE_API_KEY")
 # セッション状態の初期化
 if 'recognizer' not in st.session_state:
     st.session_state.recognizer = AmiVoice_recognition.SpeechRecognizer(APP_KEY)
@@ -34,7 +33,7 @@ st.markdown(
 st.title('音声解析アプリケーション')
 
 #薬剤師リストの読み込み
-pharmacist_list_path = "pharmacist_list.pickle"
+pharmacist_list_path = "save_dir/pharmacist_list.pickle"
 with open(pharmacist_list_path,"rb") as f:
     pharmacist_list = pickle.load(f)
     pharmacist_list = [name for name in pharmacist_list if name]

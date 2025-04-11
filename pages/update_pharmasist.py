@@ -12,7 +12,7 @@ st.title("薬剤師の名前リスト")
 st.write("薬剤師名を追加、変更、削除し画面下の更新ボタンを押してください")
 
 # データディレクトリのパスを設定
-pharmacist_list_path = "pharmacist_list.pickle"
+pharmacist_list_path = "save_dir/pharmacist_list.pickle"
 
 def add_text_inputs(pharmacist_list=None, num_columns=1):
     inputs = []

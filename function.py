@@ -1,24 +1,21 @@
 import datetime
 import io
 import os
-import pathlib
 import pickle
-import time
 import numpy as np
 import noisereduce as nr
-
-from audio_recorder_streamlit import audio_recorder
 from dotenv import load_dotenv
 from openai import OpenAI
 from pydub import AudioSegment
-import requests
 import streamlit as st
+import streamlit.components.v1 as stc
 
 load_dotenv()
 
 class Functions:
 
     def __init__(self):
+        self.PICKLE_PATH = "save_dir/pickleData/"
         self.AUDIO_DIR = "./audioData"
         self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
         self.WHISPER_API_URL = "https://api.openai.com/v1/audio/transcriptions"
@@ -40,15 +37,15 @@ class Functions:
         # 要約結果を返す
         return res.choices[0].message.content
 
-    def append_pickle_files(self,user, time_str, remarks, text, audio_path=None):
+    def append_pickle_files(self,user, time_str, remarks, text, completed = False, audio_path=None):
         """
         データをpickleファイルに保存する関数
         """
         today = datetime.date.today().strftime("%Y%m%d")
-        save_path = f"./pickleData/{today}.pickle"
+        save_path = self.PICKLE_PATH + f"{today}.pickle"
         if time_str == "now":
             time_str = datetime.datetime.now().strftime("%H:%M")
-        append_data = [user, time_str, remarks, text]  # 音声ファイルパスを追加
+        append_data = [user, time_str, remarks, text, completed]  # 音声ファイルパスを追加
         if os.path.exists(save_path):
             with open(save_path,"rb") as f:
                 data = pickle.load(f)
