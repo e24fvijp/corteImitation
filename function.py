@@ -3,7 +3,6 @@ import io
 import os
 import pickle
 import numpy as np
-import noisereduce as nr
 from dotenv import load_dotenv
 from openai import OpenAI
 from pydub import AudioSegment
@@ -24,8 +23,20 @@ class Functions:
 
         client = OpenAI(api_key=self.OPENAI_API_KEY)
 
-        with open("prompt.txt","r", encoding="utf-8") as f:
-            system_content = f.read()
+        # with open("prompt.txt","r", encoding="utf-8") as f:
+        #     system_content = f.read()
+        system_content = """あなたは薬剤師です。薬剤師と患者の会話シーンです。
+        誰が喋っている言葉かは想像してください。
+        文章を患者の主観（Ｓ）、データなどの客観情報（Ｏ）、薬剤師の評価考察（Ａ）、薬剤師の指導内容（Ｐ）として内容を要約して、
+        S:
+        O:
+        A:
+        P:
+        のような形式で箇条書きで事実のみを出力してください。:はS,O,A,Pの後以外では使わないでください。
+        質問とその解答がある場合はその解答を完結に書いてください。(例    心不全ですか？はい → 心不全)など
+        会話の中に出てこなかったものは出力せず、SOAPに合致するものがなければその項目は出力不要。
+        自己紹介文やお大事にという閉めの言葉など関係なさそうなものはSOAPに含まないでください。
+        """
 
         res = client.chat.completions.create(
             model = "gpt-4o-mini",
@@ -37,15 +48,17 @@ class Functions:
         # 要約結果を返す
         return res.choices[0].message.content
 
-    def append_pickle_files(self,user, time_str, remarks, text, completed = False, audio_path=None):
+    def append_pickle_files(self,user, time_str, remarks, recognition_text, summary_text, completed = False, audio_path=None):
         """
         データをpickleファイルに保存する関数
         """
+        if not os.path.exists(self.PICKLE_PATH):
+            os.makedirs(self.PICKLE_PATH)
         today = datetime.date.today().strftime("%Y%m%d")
         save_path = self.PICKLE_PATH + f"{today}.pickle"
         if time_str == "now":
             time_str = datetime.datetime.now().strftime("%H:%M")
-        append_data = [user, time_str, remarks, text, completed]  # 音声ファイルパスを追加
+        append_data = [user, time_str, remarks, recognition_text, summary_text, completed]  # 音声ファイルパスを追加
         if os.path.exists(save_path):
             with open(save_path,"rb") as f:
                 data = pickle.load(f)

@@ -16,20 +16,20 @@ st.markdown(
     .copy-button {
         padding: 0px;  /* 余白を完全に削減 */
         margin: 0px;   /* 余白を完全に削減 */
-        font-size: 6px;  /* 文字サイズをさらに小さく */
+        font-size: 4px; 
         background-color: #4CAF50;
         color: yellow;
         border: none;
         cursor: pointer;
         display: inline-block;
-        height: 10px;  /* ボタン高さを小さく */
-        width: 15px;   /* ボタン幅を小さく */
+        height: 8px;  /* ボタン高さを小さく */
+        width: 12px;   /* ボタン幅を小さく */
     }
     .custom {
         background-color: #f9f9f9;
         padding: 0px;
-        border-radius: 5px;
-        font-size: 18px;  /* 小さな文字サイズ */
+        border-radius: 3px;
+        font-size: 16px;  /* 小さな文字サイズ */
     }
     .action-button {
         padding: 5px 10px;
@@ -84,9 +84,9 @@ def toggle_completion(item_key):
     with open(search_file_path,"rb") as f:
         result_list = pickle.load(f)
     for i, result in enumerate(result_list):
-        time, remarks, text, completed = result[1], result[2], result[3], result[4]
-        if item_key == f"{time}_{remarks}_{text}":
-            result_list[i][4] = not completed  # 現在の状態を反転
+        time, remarks, recognition_text, summary_text, completed = result[1:6]
+        if item_key == f"{time}_{remarks}_{recognition_text}":
+            result_list[i][5] = not completed  # 現在の状態を反転
     with open(search_file_path,"wb") as f:
         pickle.dump(result_list,f)
 
@@ -99,8 +99,8 @@ def delete_data(item_key):
         # 削除するインデックスを先に特定
         delete_index = None
         for i, result in enumerate(result_list):
-            time, remarks, text, completed = result[1], result[2], result[3], result[4]
-            current_key = f"{time}_{remarks}_{text}"
+            time, remarks, recognition_text, summary_text, completed = result[1:6]
+            current_key = f"{time}_{remarks}_{recognition_text}"
             if item_key == current_key:
                 delete_index = i
                 break
@@ -120,8 +120,10 @@ def show_result(data_list):
     # セッションステートの初期化
     if 'delete_confirm' not in st.session_state:
         st.session_state.delete_confirm = None
+    if 'show_recognition' not in st.session_state:
+        st.session_state.show_recognition = {}
     
-    col1, col2 = st.columns([5,1])
+    col1, col2 = st.columns([6,1])
     remarks_list = [""] + [x[2] for x in data_list]
     with col1:
         remarks_select = st.selectbox(
@@ -135,19 +137,19 @@ def show_result(data_list):
     if remarks_select != "":
         data_list = [x for x in data_list if x[2] == remarks_select]
     if completed_hide:
-        data_list = [x for x in data_list if not x[4]]
+        data_list = [x for x in data_list if not x[5]]
     
     for i, data in enumerate(data_list[::-1]):
-        time, remarks, text, completed = data[1], data[2], data[3], data[4]
-        item_key = f"{time}_{remarks}_{text}"
+        time, remarks, recognition_text, summary_text, completed = data[1:6]
+        item_key = f"{time}_{remarks}_{recognition_text}"
         
         # 各データをexpanderで囲む
         with st.expander(f"時間: {time}   備考: {remarks}", expanded=True):
-            col1, col2 = st.columns([5, 1])
+            col1, col2 = st.columns([5, 1])  # 比率を7:1に変更
             
             with col1:
                 # テキストの表示
-                for line in text.split("\n"):
+                for line in summary_text.split("\n"):
                     if line.strip() != "":
                         for line_sprit in line.strip().split("。"):
                             if line_sprit.strip() != "":
@@ -186,6 +188,11 @@ def show_result(data_list):
                         toggle_completion(item_key)
                         st.rerun()
 
+            # recognition_textを表示
+            if st.checkbox("認識テキストを表示", key=f"show_recognition_{i}"):
+                st.text_area("認識テキスト", recognition_text.replace("\n","   "), height=200, key=f"recognition_{i}")
+
+            
 selected_date = st.date_input(
     "日付を選択(録音日)",
     value="today",

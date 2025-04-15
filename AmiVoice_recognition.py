@@ -11,7 +11,8 @@ class SpeechRecognizer:
     def __init__(self, authorization_key, grammar_file_names="-a-medical"):
         # ログ設定
         self.logger = logging.getLogger(__name__)
-        logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(threadName)s %(message)s")
+        logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(threadName)s %(levelname)s %(message)s")
+        self.logger.setLevel(logging.DEBUG)
 
         # 設定
         self.server = 'wss://acp-api.amivoice.com/v1/'
@@ -25,6 +26,7 @@ class SpeechRecognizer:
             "resultUpdatedInterval": "1000",
             "authorization": authorization_key,
         }
+        self.logger.debug(f"初期化設定: server={self.server}, codec={self.codec}, grammar={self.grammar_file_names}")
 
         # 音声録音設定
         self.CHUNK = 1024
@@ -68,22 +70,29 @@ class SpeechRecognizer:
         return self.recognition_completed
 
     def start_recording(self):
+        self.logger.debug("録音開始処理を開始")
         self.is_recording = True
-        self.stream = self.p.open(format=self.FORMAT,
-                                channels=self.CHANNELS,
-                                rate=self.RATE,
-                                input=True,
-                                frames_per_buffer=self.CHUNK)
+        try:
+            self.stream = self.p.open(format=self.FORMAT,
+                                    channels=self.CHANNELS,
+                                    rate=self.RATE,
+                                    input=True,
+                                    frames_per_buffer=self.CHUNK)
+            self.logger.debug("音声ストリームを正常に開始")
+        except Exception as e:
+            self.logger.error(f"音声ストリーム開始エラー: {e}")
+            self.is_recording = False
+            raise
         
         def record():
+            self.logger.debug("録音スレッドを開始")
             while self.is_recording:
                 try:
                     data = self.stream.read(self.CHUNK)
                     self.audio_data.extend(data)
                     
-                    # 音声データの送信間隔を調整
                     current_time = time.time()
-                    if current_time - self.last_send_time >= 0.1:  # 100msごとに送信
+                    if current_time - self.last_send_time >= 0.1:
                         if len(self.audio_data) >= self.CHUNK and self.ws_connected:
                             try:
                                 self.ws.send(b'p' + bytes(self.audio_data), opcode=websocket.ABNF.OPCODE_BINARY)
@@ -98,15 +107,24 @@ class SpeechRecognizer:
         threading.Thread(target=record).start()
 
     def stop_recording(self):
+        self.logger.debug("録音停止処理を開始")
         self.is_recording = False
         if self.stream:
-            self.stream.stop_stream()
-            self.stream.close()
-        self.wave_file.close()
-        self.audio_buffer.close()
+            try:
+                self.stream.stop_stream()
+                self.stream.close()
+                self.logger.debug("音声ストリームを正常に停止")
+            except Exception as e:
+                self.logger.error(f"音声ストリーム停止エラー: {e}")
+        try:
+            self.wave_file.close()
+            self.audio_buffer.close()
+            self.logger.debug("音声ファイルを正常に閉じました")
+        except Exception as e:
+            self.logger.error(f"音声ファイルクローズエラー: {e}")
 
     def on_open(self, ws):
-        print("WebSocket接続を開始しました")
+        self.logger.debug("WebSocket接続を開始")
         self.set_ws_connected(True)
         def start(*args):
             command = f"s {self.codec} {self.grammar_file_names}"
@@ -115,67 +133,98 @@ class SpeechRecognizer:
                     if k == 'profileWords':
                         v = '"' + v.replace('"', '""') + '"'
                     command += f" {k}={v}"
-            print(f"送信コマンド: {command}")
-            ws.send(command)
+            self.logger.debug(f"送信コマンド: {command}")
+            try:
+                ws.send(command)
+                self.logger.debug("初期化コマンドを送信")
+            except Exception as e:
+                self.logger.error(f"初期化コマンド送信エラー: {e}")
         threading.Thread(target=start).start()
 
     def on_message(self, ws, message):
         try:
-            print(f"受信メッセージ: {message}")
+            self.logger.debug(f"受信メッセージ: {message}")
             event = message[0]
             content = message[2:].rstrip()
             
-            if event == 'A':  # 最終認識結果
+            if event == 'A':
                 try:
                     result = json.loads(content)
-                    print(f"解析結果: {result}")
+                    self.logger.debug(f"解析結果: {result}")
                     if 'text' in result:
                         self.add_recognition_result(result['text'])
-                        print(f"認識結果を追加: {result['text']}")
+                        self.logger.debug(f"認識結果を追加: {result['text']}")
                         self.set_recognition_completed(True)
                     else:
-                        print(f"textキーが見つかりません: {result}")
+                        self.logger.warning(f"textキーが見つかりません: {result}")
                 except json.JSONDecodeError as e:
-                    print(f"JSONデコードエラー: {e}")
+                    self.logger.error(f"JSONデコードエラー: {e}")
             elif event == 'e':
-                print("セッション終了イベントを受信")
+                self.logger.debug("セッション終了イベントを受信")
                 self.set_ws_connected(False)
                 self.set_recognition_completed(True)
                 ws.close()
             else:
-                print(f"未処理のイベント: {event}")
+                self.logger.debug(f"未処理のイベント: {event}")
         except Exception as e:
-            print(f"メッセージ処理エラー: {e}")
             self.logger.error(f"メッセージ処理エラー: {e}")
 
     def on_error(self, ws, error):
-        print(f"WebSocketエラー: {error}")  # デバッグ用
         self.logger.error(f"WebSocketエラー: {error}")
         self.set_ws_connected(False)
+        
+        if self.is_recording and not self.recognition_completed:
+            self.logger.debug("再接続を試みます...")
+            time.sleep(2)
+            try:
+                self.start()
+                self.logger.debug("再接続に成功")
+            except Exception as e:
+                self.logger.error(f"再接続に失敗: {e}")
+                self.stop_recording()
 
     def on_close(self, ws, close_status_code, close_msg):
-        print(f"WebSocket接続を終了: {close_status_code} - {close_msg}")  # デバッグ用
+        self.logger.debug(f"WebSocket接続を終了: {close_status_code} - {close_msg}")
         self.set_ws_connected(False)
+        
+        if self.is_recording and not self.recognition_completed:
+            self.logger.debug("再接続を試みます...")
+            time.sleep(2)
+            try:
+                self.start()
+                self.logger.debug("再接続に成功")
+            except Exception as e:
+                self.logger.error(f"再接続に失敗: {e}")
+                self.stop_recording()
 
     def start(self):
-        print("音声認識を開始します")  # デバッグ用
-        # WebSocket接続の確立
+        self.logger.debug("音声認識を開始")
+        if self.ws:
+            try:
+                self.ws.close()
+                self.logger.debug("既存の接続を閉じました")
+            except Exception as e:
+                self.logger.error(f"既存の接続クローズエラー: {e}")
+        
         self.ws = websocket.WebSocketApp(self.server,
                                     on_open=self.on_open,
                                     on_message=self.on_message,
                                     on_error=self.on_error,
                                     on_close=self.on_close)
         
-        # WebSocket接続を別スレッドで開始
         ws_thread = threading.Thread(target=self.ws.run_forever)
         ws_thread.daemon = True
         ws_thread.start()
+        self.logger.debug("WebSocketスレッドを開始")
         
-        # 音声録音の開始
         self.start_recording()
 
     def stop(self):
-        print("音声認識を停止します")  # デバッグ用
+        self.logger.debug("音声認識を停止")
         self.stop_recording()
         if self.ws:
-            self.ws.close()
+            try:
+                self.ws.close()
+                self.logger.debug("WebSocket接続を閉じました")
+            except Exception as e:
+                self.logger.error(f"WebSocketクローズエラー: {e}")
