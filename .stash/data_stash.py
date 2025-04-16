@@ -26,11 +26,10 @@ st.markdown(
         width: 12px;   /* ボタン幅を小さく */
     }
     .custom {
-        background-color: #87cefa;
+        background-color: #f9f9f9;
         padding: 0px;
         border-radius: 3px;
-        font-size: 14px;  /* 小さな文字サイズ */
-        text-align:center;
+        font-size: 16px;  /* 小さな文字サイズ */
     }
     .action-button {
         padding: 5px 10px;
@@ -51,6 +50,34 @@ st.markdown(
     </style>
     """,
     unsafe_allow_html=True)
+
+
+def write_copyable_text(text):
+    if ":" in text:
+        copy_text = text.split(":")[1].strip()
+    else:
+        copy_text = text
+    html_content = f"""
+    <button class="copy-button" onclick="navigator.clipboard.writeText('{copy_text}')">
+        copy
+    </button>
+    """
+
+    if ":" in text:
+        col1, col2, col3 = st.columns([1,3,20])
+        with col1:
+            st.markdown(f'<div class="custom">{text.split(":")[0]}</div>', unsafe_allow_html=True)
+        with col2:
+            stc.html(html_content, height=30)
+        with col3:
+            st.markdown(f'<div class="custom">{text.split(":")[1]}</div>', unsafe_allow_html=True)
+    else:
+        col1, col2, col3 = st.columns([1,3,20])
+        with col2:
+            stc.html(html_content, height=30)
+        with col3:
+            st.markdown(f'<div class="custom">{text}</div>', unsafe_allow_html=True)
+
 
 def toggle_completion(item_key):
     search_file_path = f"./save_dir/pickleData/{selected_date.strftime('%Y%m%d')}.pickle"
@@ -88,53 +115,20 @@ def delete_data(item_key):
     except Exception as e:
         st.error(f"削除中にエラーが発生しました: {str(e)}")
         return False
-    
-def generate_string_to_paste(text):
-    section_split = {"S":"","O":"","A":"","P":""}
-    for line in text.split("\n"):
-        section = line.strip()[0]
-        section_split[section] += line.split(":")[1].strip() + "\n"
-    result_text = ""
-    for section in section_split.keys():
-        if section_split[section] != "":
-            result_text += section_split[section] + "\n"
-        else:
-            result_text += "\n"
-    return result_text
-
 
 def show_result(data_list):
     # セッションステートの初期化
     if 'delete_confirm' not in st.session_state:
         st.session_state.delete_confirm = None
-    if 'checkbox_states' not in st.session_state:
-        st.session_state.checkbox_states = {}
-    if 'selected_texts_dict' not in st.session_state:
-        st.session_state.selected_texts_dict = {}
-    if 'checkbox_keys' not in st.session_state:
-        st.session_state.checkbox_keys = []
-    if 'last_action' not in st.session_state:
-        st.session_state.last_action = None
-    if 'force_rerun' not in st.session_state:
-        st.session_state.force_rerun = False
-
-    # セッション状態のリセット
-    if 'reset_checkboxes' not in st.session_state:
-        st.session_state.reset_checkboxes = True
-        st.session_state.checkbox_states = {}
-        st.session_state.selected_texts_dict = {}
-        st.session_state.checkbox_keys = []
-        st.session_state.last_action = None
-        st.session_state.force_rerun = False
-        st.session_state.reset_checkboxes = False
-
-    col1, col2 = st.columns([5,1])
+    if 'show_recognition' not in st.session_state:
+        st.session_state.show_recognition = {}
+    
+    col1, col2 = st.columns([6,1])
     remarks_list = [""] + [x[2] for x in data_list]
     with col1:
         remarks_select = st.selectbox(
             "備考欄で検索",
-            remarks_list,
-            key="remarks_select"
+            remarks_list
         )
     with col2:
         completed_hide = st.checkbox("完了済み\n非表示", key="hide_completed")
@@ -149,63 +143,17 @@ def show_result(data_list):
         time, remarks, recognition_text, summary_text, completed = data[1:6]
         item_key = f"{time}_{remarks}_{recognition_text}"
         
-        # 各データの選択テキストを初期化
-        if item_key not in st.session_state.selected_texts_dict:
-            st.session_state.selected_texts_dict[item_key] = []
-        
+        # 各データをexpanderで囲む
         with st.expander(f"時間: {time}   備考: {remarks}", expanded=True):
-            col1, col2 = st.columns([5, 1])
+            col1, col2 = st.columns([5, 1])  # 比率を7:1に変更
             
             with col1:
-                section = ""
+                # テキストの表示
                 for line in summary_text.split("\n"):
                     if line.strip() != "":
                         for line_sprit in line.strip().split("。"):
-                            if ":" in line_sprit:
-                                section = line_sprit.split(":")[0]
                             if line_sprit.strip() != "":
-                                if ":" not in line_sprit:
-                                    checkbox_label = section + ":" + line_sprit.strip()
-                                else:
-                                    checkbox_label = line_sprit.strip()
-                                
-                                checkbox_key = f"{item_key}_{checkbox_label.strip()}"
-                                
-                                # チェックボックスのキーを保存
-                                if checkbox_key not in st.session_state.checkbox_keys:
-                                    st.session_state.checkbox_keys.append(checkbox_key)
-                                
-                                # チェックボックスの状態を初期化
-                                if checkbox_key not in st.session_state.checkbox_states:
-                                    st.session_state.checkbox_states[checkbox_key] = False
-                                
-                                # チェックボックスの表示と状態更新
-                                checkbox_state = st.checkbox(
-                                    checkbox_label,
-                                    key=checkbox_key,
-                                    value=st.session_state.checkbox_states[checkbox_key]
-                                )
-                                
-                                # 状態の更新を即時反映
-                                if checkbox_state != st.session_state.checkbox_states[checkbox_key]:
-                                    st.session_state.checkbox_states[checkbox_key] = checkbox_state
-                                    st.session_state.last_action = checkbox_key
-                                    st.session_state.force_rerun = True
-                                    if checkbox_state and checkbox_label not in st.session_state.selected_texts_dict[item_key]:
-                                        st.session_state.selected_texts_dict[item_key].append(checkbox_label)
-                                    elif not checkbox_state and checkbox_label in st.session_state.selected_texts_dict[item_key]:
-                                        st.session_state.selected_texts_dict[item_key].remove(checkbox_label)
-                                elif checkbox_state and checkbox_label not in st.session_state.selected_texts_dict[item_key]:
-                                    st.session_state.selected_texts_dict[item_key].append(checkbox_label)
-                
-                # 選択されたテキストの表示
-                if st.session_state.selected_texts_dict[item_key]:
-                    st.markdown("""<div class='custom'>選択したテキスト表示。
-                                下のボックスの右上のコピーボタンを押してください。<br>
-                                薬歴が空の状態でペーストしてください。</div>"""
-                                , unsafe_allow_html=True)
-                    code_text = generate_string_to_paste("\n".join(st.session_state.selected_texts_dict[item_key]))
-                    st.code(code_text,language="markdown")
+                                write_copyable_text(line_sprit.strip())
             
             with col2:
                 # 削除ボタン
@@ -241,14 +189,10 @@ def show_result(data_list):
                         st.rerun()
 
             # recognition_textを表示
-            if st.checkbox("✨認識テキストを表示✨", key=f"show_recognition_{i}"):
+            if st.checkbox("認識テキストを表示", key=f"show_recognition_{i}"):
                 st.text_area("認識テキスト", recognition_text.replace("\n","   "), height=200, key=f"recognition_{i}")
 
-    # 強制再レンダリング
-    if st.session_state.force_rerun:
-        st.session_state.force_rerun = False
-        st.rerun()
-
+            
 selected_date = st.date_input(
     "日付を選択(録音日)",
     value="today",

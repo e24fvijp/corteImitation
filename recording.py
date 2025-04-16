@@ -1,6 +1,6 @@
 import streamlit as st
 import pickle
-import datetime 
+import pyaudio
 import time
 import AmiVoice_recognition
 import dotenv
@@ -119,30 +119,50 @@ def toggle_recording():
     if not st.session_state.is_recording:
         # 録音開始
         print("録音を開始します")
-        st.session_state.recognizer.clear_results()
-        st.session_state.recognizer.start()
-        st.session_state.is_recording = True
-        st.session_state.results = ""
-        st.session_state.recognition_completed = False
-        st.session_state.processing_started = False
+        try:
+            st.session_state.recognizer.clear_results()
+            st.session_state.recognizer.start()
+            st.session_state.is_recording = True
+            st.session_state.results = ""
+            st.session_state.recognition_completed = False
+            st.session_state.processing_started = False
+        except Exception as e:
+            logger.error(f"録音開始処理でエラーが発生しました: {e}")
+            st.error("録音の開始に失敗しました。")
+            st.session_state.is_recording = False
     else:
         # 録音停止
         print("録音を停止します")
         try:
+            # 音声認識を停止
             st.session_state.recognizer.stop()
+            
             # 結果の取得前に少し待機
             time.sleep(1)
+            
+            # 結果を取得
             results = st.session_state.recognizer.get_all_results()
-            st.session_state.results = results
-            st.session_state.last_results = results
+            if results:
+                st.session_state.results = results
+                st.session_state.last_results = results
+                st.session_state.recognition_completed = st.session_state.recognizer.is_recognition_completed()
+                st.session_state.processing_started = True
+            else:
+                st.warning("認識結果が取得できませんでした。")
+            
             st.session_state.is_recording = False
-            st.session_state.recognition_completed = st.session_state.recognizer.is_recognition_completed()
-            st.session_state.processing_started = True
+            
         except Exception as e:
-            print(f"録音停止処理でエラーが発生しました: {e}")
+            logger.error(f"録音停止処理でエラーが発生しました: {e}")
+            st.error("録音の停止に失敗しました。")
             st.session_state.is_recording = False
             st.session_state.recognition_completed = False
             st.session_state.processing_started = False
+            # エラーが発生した場合でも、音声認識を確実に停止
+            try:
+                st.session_state.recognizer.stop()
+            except:
+                pass
 
 # 録音状態の表示
 status_text = st.empty()
