@@ -25,7 +25,7 @@ class Functions:
 
     def __init__(self):
         self.PICKLE_PATH = "save_dir/pickleData/"
-        self._decrypt_env_file()
+        # self._decrypt_env_file()
         self.OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]#os.getenv("OPENAI_API_KEY")
         self.AMIVOICE_APP_KEY = st.secrets["AMIVOICE_APP_KEY"]#os.getenv("AMIVOICE_APP_KEY")
         # self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
