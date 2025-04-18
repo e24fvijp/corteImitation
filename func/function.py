@@ -7,15 +7,22 @@ import os
 import pickle
 # import dotenv 
 from openai import OpenAI
+import yaml
 
 class Auth:
     def __init__(self):
         try:
+            # Secretsから認証情報を取得
+            config = {
+                'credentials': st.secrets["credentials"],
+                'cookie': st.secrets["cookie"]
+            }
+            
             self.authenticator = stauth.Authenticate(
-                st.secrets["credentials"],
-                st.secrets["cookie"]["name"],
-                st.secrets["cookie"]["key"],
-                st.secrets["cookie"]["expiry_days"]
+                config['credentials'],
+                config['cookie']['name'],
+                config['cookie']['key'],
+                config['cookie']['expiry_days']
             )
         except Exception as e:
             st.error(f"認証設定の読み込みに失敗しました: {str(e)}")
