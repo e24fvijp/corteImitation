@@ -5,9 +5,8 @@ import streamlit_authenticator as stauth
 import datetime
 import os
 import pickle
-import dotenv
+# import dotenv 
 from openai import OpenAI
-from cryptography.fernet import Fernet
 
 class Auth:
     def __init__(self):
@@ -32,37 +31,37 @@ class Functions:
         # self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
         # self.WHISPER_API_URL = "https://api.openai.com/v1/audio/transcriptions"
 
-    def _decrypt_env_file(self,key_file='APIs/key.key', encrypted_file='APIs/.env.encrypted'):
-    #暗号化された.envファイルを復号化
-    #exe化した後はAPIsのフォルダも一緒に配布する必要あり、
-        try:
-            # 暗号化キーを読み込み
-            with open(key_file, 'rb') as file:
-                key = file.read()
+    # def _decrypt_env_file(self,key_file='APIs/key.key', encrypted_file='APIs/.env.encrypted'):
+    # #暗号化された.envファイルを復号化
+    # #exe化した後はAPIsのフォルダも一緒に配布する必要あり、
+    #     try:
+    #         # 暗号化キーを読み込み
+    #         with open(key_file, 'rb') as file:
+    #             key = file.read()
             
-            # 暗号化されたデータを読み込み
-            with open(encrypted_file, 'rb') as file:
-                encrypted_data = file.read()
+    #         # 暗号化されたデータを読み込み
+    #         with open(encrypted_file, 'rb') as file:
+    #             encrypted_data = file.read()
             
-            # 復号化
-            f = Fernet(key)
-            decrypted_data = f.decrypt(encrypted_data)
+    #         # 復号化
+    #         f = Fernet(key)
+    #         decrypted_data = f.decrypt(encrypted_data)
             
-            # 一時的な.envファイルを作成
-            with open('.env.temp', 'wb') as file:
-                file.write(decrypted_data)
+    #         # 一時的な.envファイルを作成
+    #         with open('.env.temp', 'wb') as file:
+    #             file.write(decrypted_data)
             
-            # 環境変数を読み込み
-            dotenv.load_dotenv('.env.temp')
+    #         # 環境変数を読み込み
+    #         dotenv.load_dotenv('.env.temp')
             
-            # 一時ファイルを削除
-            os.remove('.env.temp')
+    #         # 一時ファイルを削除
+    #         os.remove('.env.temp')
             
-        except Exception as e:
-            return 
-            logger.error(f"環境変数の復号化に失敗しました: {str(e)}")
-            st.error("環境変数の読み込みに失敗しました。")
-            st.stop()
+    #     except Exception as e:
+    #         return 
+    #         logger.error(f"環境変数の復号化に失敗しました: {str(e)}")
+    #         st.error("環境変数の読み込みに失敗しました。")
+    #         st.stop()
 
     def make_summary(self, prompt):
 

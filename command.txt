@@ -1,0 +1,2 @@
+pip command
+pip install streamlit streamlit-authenticator openai pyaudio websocket websocket-client
