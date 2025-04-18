@@ -10,5 +10,6 @@ save_dir/
 save_dir/pharmacist_list.pickle
 encrypt_config.py
 .env
-config.yaml
+secrets.toml
+
 
