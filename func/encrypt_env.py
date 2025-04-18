@@ -6,12 +6,12 @@ def generate_key():
     """暗号化キーを生成"""
     return Fernet.generate_key()
 
-def encrypt_env_file(key, input_file='.env', output_file='APIs/.env.encrypted'):
+def encrypt_env_file(key, input_file='../.env', output_file='../APIs/.env.encrypted'):
     if not os.path.exists('APIs'):
         os.makedirs('APIs')
     """.envファイルを暗号化"""
     # 暗号化キーをファイルに保存
-    with open('APIs/key.key', 'wb') as key_file:
+    with open('../APIs/key.key', 'wb') as key_file:
         key_file.write(key)
     
     # .envファイルの内容を読み込み

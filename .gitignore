@@ -2,10 +2,12 @@ __pycache__/
 .corteImitation/
 .venv/
 build/
-dist/
+.stash/
+.streamlit/
 APIs/
+func/__pycache__/
 save_dir/
+encrypt_config.py
 .env
-corteImitation.spec
-save_dir/pharmacist_list.pickle
+config.yaml
 

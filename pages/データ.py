@@ -3,6 +3,14 @@ import pickle
 import streamlit as st
 import streamlit.components.v1 as stc
 
+from func.function import Auth
+
+st.set_page_config(
+    page_title="データ",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 #ページの翻訳提案をしないように設定
 st.markdown(
     '<meta name="google" content="notranslate">', 
@@ -13,18 +21,6 @@ st.markdown(
 st.markdown(
     """
     <style>
-    .copy-button {
-        padding: 0px;  /* 余白を完全に削減 */
-        margin: 0px;   /* 余白を完全に削減 */
-        font-size: 4px; 
-        background-color: #4CAF50;
-        color: yellow;
-        border: none;
-        cursor: pointer;
-        display: inline-block;
-        height: 8px;  /* ボタン高さを小さく */
-        width: 12px;   /* ボタン幅を小さく */
-    }
     .custom {
         background-color: #87cefa;
         padding: 0px;
@@ -51,6 +47,7 @@ st.markdown(
     </style>
     """,
     unsafe_allow_html=True)
+
 
 def toggle_completion(item_key):
     search_file_path = f"./save_dir/pickleData/{selected_date.strftime('%Y%m%d')}.pickle"
@@ -249,29 +246,43 @@ def show_result(data_list):
         st.session_state.force_rerun = False
         st.rerun()
 
-selected_date = st.date_input(
-    "日付を選択(録音日)",
-    value="today",
-    min_value=None,
-    max_value=None,
-    format="YYYY/MM/DD"
-)
+auth = Auth()
+auth.authenticator.login()
 
-if selected_date:
-    search_file_path = f"./save_dir/pickleData/{selected_date.strftime('%Y%m%d')}.pickle"
-    if os.path.exists(search_file_path):
-        with open(search_file_path, "rb") as f:
-            data = pickle.load(f)
-        if not data:
-            st.write(f"{selected_date}のデータはありません")
+#-------------------ログインできているときの処理-------------------
+if st.session_state['authentication_status']:
+    auth.authenticator.logout()
+
+    selected_date = st.date_input(
+        "日付を選択(録音日)",
+        value="today",
+        min_value=None,
+        max_value=None,
+        format="YYYY/MM/DD"
+    )
+
+    if selected_date:
+        search_file_path = f"./save_dir/pickleData/{selected_date.strftime('%Y%m%d')}.pickle"
+        if os.path.exists(search_file_path):
+            with open(search_file_path, "rb") as f:
+                data = pickle.load(f)
+            if not data:
+                st.write(f"{selected_date}のデータはありません")
+            else:
+                user_list = list(set([x[0] for x in data]))
+                user = st.radio(
+                    "薬剤師を選択",
+                    user_list,
+                    horizontal=True
+                )
+                show_data = [x for x in data if x[0] == user]
+                show_result(show_data)
         else:
-            user_list = list(set([x[0] for x in data]))
-            user = st.radio(
-                "薬剤師を選択",
-                user_list,
-                horizontal=True
-            )
-            show_data = [x for x in data if x[0] == user]
-            show_result(show_data)
-    else:
-        st.write(f"{selected_date}のデータはありません")
+            st.write(f"{selected_date}のデータはありません")
+
+#-------------------ログインできていない場合-------------------
+
+elif st.session_state["authentication_status"] is False:
+    st.error("ユーザー名またはパスワードが正しくありません")
+elif st.session_state["authentication_status"] is None:
+    st.warning("ユーザー名とパスワードを入力しログインしてください")

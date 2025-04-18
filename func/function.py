@@ -1,23 +1,68 @@
+import streamlit as st
+import streamlit_authenticator as stauth
+# import yaml
+# from yaml.loader import SafeLoader
 import datetime
-import io
 import os
 import pickle
-import numpy as np
-from dotenv import load_dotenv
+import dotenv
 from openai import OpenAI
-from pydub import AudioSegment
-import streamlit as st
-import streamlit.components.v1 as stc
+from cryptography.fernet import Fernet
 
-load_dotenv()
+class Auth:
+    def __init__(self):
+        try:
+            self.authenticator = stauth.Authenticate(
+                st.secrets["credentials"],
+                st.secrets["cookie"]["name"],
+                st.secrets["cookie"]["key"],
+                st.secrets["cookie"]["expiry_days"]
+            )
+        except Exception as e:
+            st.error("認証設定の読み込みに失敗しました。")
+            st.stop()
 
 class Functions:
 
     def __init__(self):
         self.PICKLE_PATH = "save_dir/pickleData/"
-        self.AUDIO_DIR = "./audioData"
-        self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-        self.WHISPER_API_URL = "https://api.openai.com/v1/audio/transcriptions"
+        self._decrypt_env_file()
+        self.OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]#os.getenv("OPENAI_API_KEY")
+        self.AMIVOICE_APP_KEY = st.secrets["AMIVOICE_APP_KEY"]#os.getenv("AMIVOICE_APP_KEY")
+        # self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+        # self.WHISPER_API_URL = "https://api.openai.com/v1/audio/transcriptions"
+
+    def _decrypt_env_file(self,key_file='APIs/key.key', encrypted_file='APIs/.env.encrypted'):
+    #暗号化された.envファイルを復号化
+    #exe化した後はAPIsのフォルダも一緒に配布する必要あり、
+        try:
+            # 暗号化キーを読み込み
+            with open(key_file, 'rb') as file:
+                key = file.read()
+            
+            # 暗号化されたデータを読み込み
+            with open(encrypted_file, 'rb') as file:
+                encrypted_data = file.read()
+            
+            # 復号化
+            f = Fernet(key)
+            decrypted_data = f.decrypt(encrypted_data)
+            
+            # 一時的な.envファイルを作成
+            with open('.env.temp', 'wb') as file:
+                file.write(decrypted_data)
+            
+            # 環境変数を読み込み
+            dotenv.load_dotenv('.env.temp')
+            
+            # 一時ファイルを削除
+            os.remove('.env.temp')
+            
+        except Exception as e:
+            return 
+            logger.error(f"環境変数の復号化に失敗しました: {str(e)}")
+            st.error("環境変数の読み込みに失敗しました。")
+            st.stop()
 
     def make_summary(self, prompt):
 
@@ -68,29 +113,28 @@ class Functions:
         with open(save_path,"wb") as f:
             pickle.dump(data,f)
 
-    def audio_processor(self, audio_byte):
-        # BytesIO オブジェクトに変換
-        audio_io = io.BytesIO(audio_byte)
-        # pydub で wav 読み込み & モノラル変換
-        audio = AudioSegment.from_wav(audio_io)
-        audio_np = np.array(audio.get_array_of_samples())
-        reduced_audio_np = nr.reduce_noise(y=audio_np,sr=audio.frame_rate)
-        reduced_audio = AudioSegment(
-            reduced_audio_np.tobytes(),
-            frame_rate=audio.frame_rate,
-            sample_width=audio.sample_width,
-            channels=audio.channels
-        )
-        # 音量の正規化（-20dBFSに正規化）
-        normalized_audio = reduced_audio.normalize(headroom=0.1)
-        # 音声データをバイト列に変換
-        wav_io = io.BytesIO()
-        normalized_audio.export(wav_io, format="wav")
-        wav_bytes = wav_io.getvalue()
-        return wav_bytes
+    # def audio_processor(self, audio_byte):
+    #     # BytesIO オブジェクトに変換
+    #     audio_io = io.BytesIO(audio_byte)
+    #     # pydub で wav 読み込み & モノラル変換
+    #     audio = AudioSegment.from_wav(audio_io)
+    #     audio_np = np.array(audio.get_array_of_samples())
+    #     reduced_audio_np = nr.reduce_noise(y=audio_np,sr=audio.frame_rate)
+    #     reduced_audio = AudioSegment(
+    #         reduced_audio_np.tobytes(),
+    #         frame_rate=audio.frame_rate,
+    #         sample_width=audio.sample_width,
+    #         channels=audio.channels
+    #     )
+    #     # 音量の正規化（-20dBFSに正規化）
+    #     normalized_audio = reduced_audio.normalize(headroom=0.1)
+    #     # 音声データをバイト列に変換
+    #     wav_io = io.BytesIO()
+    #     normalized_audio.export(wav_io, format="wav")
+    #     wav_bytes = wav_io.getvalue()
+    #     return wav_bytes
 
-    def check_unprocessed(self,date):
-        pass
+    # def check_unprocessed(self,date):
         #audioファイルはあるが、解析済みのpickleデータがないもののチェック
         # unprocessed_wav_list = []
         # date_str = date.strftime('%Y%m%d')
@@ -108,8 +152,7 @@ class Functions:
         #     unprocessed_wav_list = wav_file_paths
         # return unprocessed_wav_list
     
-    def load_and_analyze_unprocessed(unprocessed_list):
-        pass
+    # def load_and_analyze_unprocessed(unprocessed_list):
         # for audio_path in unprocessed_list:
         #     audio = AudioSegment.from_wav(audio_path)
         #     wav_io = io.BytesIO()
