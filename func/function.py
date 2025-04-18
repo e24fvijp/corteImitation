@@ -18,7 +18,8 @@ class Auth:
                 st.secrets["cookie"]["expiry_days"]
             )
         except Exception as e:
-            st.error("認証設定の読み込みに失敗しました。")
+            st.error(f"認証設定の読み込みに失敗しました: {str(e)}")
+            st.error("Secretsの設定を確認してください。")
             st.stop()
 
 class Functions:
