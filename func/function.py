@@ -14,7 +14,9 @@ class Auth:
         try:
             # Secretsから認証情報を取得
             config = {
-                'credentials': st.secrets["credentials"],
+                'credentials': {
+                    'usernames': st.secrets["credentials"]["usernames"]
+                },
                 'cookie': st.secrets["cookie"]
             }
             
