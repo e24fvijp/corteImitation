@@ -12,19 +12,17 @@ import yaml
 class Auth:
     def __init__(self):
         try:
-            # Secretsから認証情報を取得
-            config = {
-                'credentials': {
-                    'usernames': st.secrets["credentials"]["usernames"]
-                },
-                'cookie': st.secrets["cookie"]
+            # Secretsから認証情報を取得し、新しい辞書を作成
+            credentials = {
+                'usernames': dict(st.secrets["credentials"]["usernames"])
             }
             
+            # 認証情報をコピーして使用
             self.authenticator = stauth.Authenticate(
-                config['credentials'],
-                config['cookie']['name'],
-                config['cookie']['key'],
-                config['cookie']['expiry_days']
+                credentials,
+                st.secrets["cookie"]["name"],
+                st.secrets["cookie"]["key"],
+                st.secrets["cookie"]["expiry_days"]
             )
         except Exception as e:
             st.error(f"認証設定の読み込みに失敗しました: {str(e)}")
